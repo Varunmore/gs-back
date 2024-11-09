@@ -1,35 +1,37 @@
+import asyncio
+import cv2
 from aiortc import VideoStreamTrack
 from av import VideoFrame
-import cv2
-import numpy as np
-import asyncio
+import subprocess
 
-class GameStreamTrack(VideoStreamTrack):
-    """
-    A video stream track that captures frames from a game or screen.
-    """
-    def __init__(self):
-        super().__init__()  # Initialize base class
-        self.cap = cv2.VideoCapture(0)  # Replace with actual game capture device or screen
-        if not self.cap.isOpened():
-            raise Exception("Could not open video source")
-        self.fps = 30  # Set desired frames per second
+class MoonlightStreamTrack(VideoStreamTrack):
+    def __init__(self, game_id):
+        super().__init__()
+        self.game_id = game_id
+        # Launch Moonlight in subprocess to capture video
+        self.moonlight_proc = subprocess.Popen(
+            ["moonlight", "stream", "HOST_IP", "-app", self.game_id],
+            stdout=subprocess.PIPE,
+            stderr=subprocess.PIPE
+        )
+        self.fps = 60
         self.delay = 1 / self.fps
 
     async def recv(self):
+        # Capture frames from Moonlight’s output
         loop = asyncio.get_event_loop()
-        ret, frame = await loop.run_in_executor(None, self.cap.read)
+        ret, frame = await loop.run_in_executor(None, self._capture_frame)
         if not ret:
-            raise Exception("Failed to read frame from video source")
-        
-        # Process frame (resize, encode, etc.)
-        frame = cv2.cvtColor(frame, cv2.COLOR_BGR2RGB)
-        video_frame = VideoFrame.from_ndarray(frame, format="rgb24")
-        video_frame.pts = None
-        video_frame.time_base = None
+            raise Exception("Failed to capture frame.")
+        video_frame = VideoFrame.from_ndarray(frame, format="bgr24")
         await asyncio.sleep(self.delay)
         return video_frame
 
-    def __del__(self):
-        if self.cap.isOpened():
-            self.cap.release()
+    def _capture_frame(self):
+        ret, frame = self.cap.read()
+        if ret:
+            frame = cv2.cvtColor(frame, cv2.COLOR_BGR2RGB)
+        return ret, frame
+
+    def stop(self):
+        self.moonlight_proc.terminate()
