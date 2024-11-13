@@ -10,7 +10,7 @@ class MoonlightStreamTrack(VideoStreamTrack):
         self.game_id = game_id
         # Launch Moonlight in subprocess to capture video
         self.moonlight_proc = subprocess.Popen(
-            ["moonlight", "stream", "HOST_IP", "-app", self.game_id],
+            ["moonlight", "stream", "103.211.112.53", "-app", self.game_id],
             stdout=subprocess.PIPE,
             stderr=subprocess.PIPE
         )
